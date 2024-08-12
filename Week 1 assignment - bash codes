@@ -1,0 +1,133 @@
+### 1) If ram usage is more than 80%, print error/ usage is higher, if it's less than 80, then usage is normal.
+
+#!/bin/bash
+ 
+while true; do
+ memt=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+ mema=$(grep MemAvailable /proc/meminfo |awk '{print $2}')
+ #memp=$( (memt - mema ) * 100)
+ memu=$(( ( ( (memt - mema ) * 100 ) / memt ) ))
+ 
+ if [ "$memu" -gt 80 ]; then
+   echo "RAM usage is high : ${memu}%"
+ else
+   echo "RAM usage normal : ${memu}%"
+ fi
+ 
+ sleep 5
+done
+
+### 2) write a script, that will get process name as input, if process is running, it should print process id and current memory usage of the proces if process is not running, print message that process is not running
+
+
+#!/bin/bash
+
+read -p "Enter process name: " pname
+
+# Check if process is running
+pid=$(pgrep "$pname")
+if [ -z "$pid" ]; then
+    echo "Process is not running"
+    exit 1
+fi
+
+# Get memory usage
+mem_usage=$(pmap -x "$pid" | awk '/total kB/{print $3}' )
+
+# Print results
+echo "Process ID: $pid"
+echo "Current Memory Usage: $mem_usage"
+
+### 3) write a script that will print the cpu load, in the last 1min,5min, 15min, current cpu utilisation, memory utilisation, disk utilisation in persentage.
+
+#!/bin/bash
+
+loada=$(uptime | awk -F'[a-z]:' '{ print $2 }')
+echo "CPU load averages (1min, 5min, 15min): $loada"
+
+#cpu utilisation
+cpuutilisation=$(top -bn1 | grep "cpu(s)" | sed "s/.*.*\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1"%"}')
+echo "current cpu utilisation : $cpuutilisation"
+
+#memory utilisation
+tmem=$(free | grep mem | awk '{print $2}')
+umem=$(free | grep mem | awk '{print $3}')
+memutilisation=$(awk "Begin {print ($umem/$tmem)*100}")
+echo "memory utilisation: $memutilisation%"
+
+#disk utilisation
+
+disku=$(df -h / | grep / | awk '{print $5}')
+echo "Disk Utilisation: $disku"
+
+### 4) user creation script, it should give username as input , it should create user if the user doesn't exist on the system....if user exists already....check whether the password is already set for the user. if not then set a password
+
+#!/bin/bash
+
+# Function to check if a user exists
+user_exists() {
+    id "$1" &>/dev/null
+}
+
+# Function to check if a password is set for the user
+password_set() {
+    local username="$1"
+    # Check if the password field in /etc/shadow is not empty
+    grep "^$username:" /etc/shadow | cut -d: -f2 | grep -q '^[^!]'
+}
+
+# Read the username from input
+read -p "Enter the username: " username
+
+# Check if the user exists
+if user_exists "$username"; then
+    echo "User '$username' already exists."
+
+    # Check if a password is set for the user
+    if password_set "$username"; then
+        echo "Password is set for user '$username'."
+    else
+        echo "No password is set for user '$username'."
+    fi
+else
+    # Create the user if it doesn't exist
+    sudo useradd "$username"
+    echo "User '$username' created."
+
+    # Prompt to set a password
+    echo "Please set a password for the new user:"
+    sudo passwd "$username"
+fi
+
+### 5) user creation script, it should give username as input , it should create user if the user doesn't exist on the system....if user exists already....check whether the password is already set for the user. if not then set a password
+
+#!/bin/bash
+
+
+threshold=104857600
+
+echo "Enter the directory path:"
+read directory
+
+echo "Enter the file pattern:"
+read pattern
+
+if [ ! -d "$directory" ]; then
+  echo "$directory is not a directory"
+  exit 1
+fi
+
+cd "$directory" || exit 1
+
+for file in "$pattern"; do
+  if [[ -f "$file" ]]; then
+    filesize=$(stat -c "%s" "$file")
+    if [ "$filesize" -gt "$threshold" ]; then
+      tarfile="${file}.tar.gz"
+      tar czf "$tarfile" "$file"
+      rm "$file"
+      touch "$file"
+      echo "Compressed and deleted $file"
+    fi
+  fi
+done
